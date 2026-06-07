@@ -1,0 +1,45 @@
+[Unit]
+Description=CPU Usage Monitor Service
+Documentation=https://github.com/amithalbreich15/DevOps-Home-Assignment-Elbit
+After=network.target
+
+[Service]
+Type=simple
+
+# Dedicated low-privilege user
+User=nobody
+Group=nogroup
+
+WorkingDirectory=/opt/cpu_monitor
+
+# Load configuration and secrets from external env file
+EnvironmentFile=/etc/cpu_monitor.env
+
+# Python path – adjust if using a venv
+ExecStart=/usr/bin/python3 /opt/cpu_monitor/cpu_monitor.py
+
+# Restart policy
+Restart=always
+RestartSec=5
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+# Resource limits
+MemoryMax=128M
+CPUQuota=10%
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+
+# Allow writing only to log/temp paths
+ReadWritePaths=/var/log /tmp
+
+# Output capture
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cpu_monitor
+
+[Install]
+WantedBy=multi-user.target

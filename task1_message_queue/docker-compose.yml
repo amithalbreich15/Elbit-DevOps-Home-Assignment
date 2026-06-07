@@ -1,0 +1,38 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Task 1 – RabbitMQ Message Queue
+# Production-ready docker-compose for local development and CI.
+#
+# Usage:
+#   docker compose up -d          # start RabbitMQ in background
+#   docker compose down -v        # stop and remove volumes
+#
+# Management UI: http://localhost:15672  (root / change_me_do_not_commit_real_password)
+# ─────────────────────────────────────────────────────────────────────────────
+services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq_abc
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+      RABBITMQ_PLUGINS: "rabbitmq_management rabbitmq_prometheus"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  rabbitmq_data:
+    driver: local

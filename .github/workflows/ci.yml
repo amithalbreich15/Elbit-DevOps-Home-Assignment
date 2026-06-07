@@ -1,0 +1,84 @@
+name: CI – Lint & Test
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  # ── Task 1: Message Queue ─────────────────────────────────────────────────
+  task1-tests:
+    name: Task 1 – Publisher / Consumer
+    runs-on: ubuntu-latest
+
+    services:
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Task 1 dependencies
+        run: pip install -r task1_message_queue/requirements.txt pylint
+
+      - name: Lint publisher
+        run: pylint task1_message_queue/publisher.py --disable=C0114,C0115
+
+      - name: Lint consumer
+        run: pylint task1_message_queue/consumer.py --disable=C0114,C0115
+
+      - name: Smoke-test publisher (sends 3 messages)
+        env:
+          RABBITMQ_HOST: localhost
+          NUM_MESSAGES: "3"
+          MESSAGE_DELAY: "0"
+        run: python task1_message_queue/publisher.py
+
+  # ── Task 2: CPU Monitor ───────────────────────────────────────────────────
+  task2-tests:
+    name: Task 2 – CPU Monitor
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Task 2 dependencies
+        run: pip install -r task2_cpu_monitor/requirements.txt pylint
+
+      - name: Lint cpu_monitor
+        run: pylint task2_cpu_monitor/cpu_monitor.py --disable=C0114,C0115
+
+      - name: Smoke-test (run monitor for 3 seconds then kill)
+        run: |
+          timeout 3 python task2_cpu_monitor/cpu_monitor.py || true
+
+  # ── Docker build check ─────────────────────────────────────────────────────
+  docker-build:
+    name: Docker Build Check
+    runs-on: ubuntu-latest
+    needs: [task1-tests, task2-tests]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Task 1 image
+        run: docker build -t devops-task1:ci task1_message_queue/
+
+      - name: Build Task 2 image
+        run: docker build -t devops-task2:ci task2_cpu_monitor/
