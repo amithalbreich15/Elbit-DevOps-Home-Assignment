@@ -892,21 +892,3 @@ This project demonstrates:
 | Shared repo / zip | GitHub repository |
 
 ---
-
-# Suggested Interview Summary
-
-This project implements the Elbit DevOps home assignment using Python, RabbitMQ, Docker, and monitoring tools.
-
-For the messaging task, I built a RabbitMQ publisher and consumer using a queue named `ABC`, including durable queues, persistent messages, acknowledgments, retries, and a dead-letter queue.
-
-For the monitoring task, I built a Python CPU monitor using `psutil`, with configurable thresholds, logging, SMTP alerts, Docker secrets, Prometheus metrics, Grafana support, and systemd deployment.
-
-For the bonus task, I explained multicast networking and how multicast traffic can be routed or tunneled between networks using technologies such as IGMP, PIM-SM, GRE, AMT, and mVPN.
-
-I also added Docker Compose and GitHub Actions to make the project easier to run, test, and review.
-
----
-
-# License
-
-This project was created as a home assignment solution for DevOps interview preparation and demonstration purposes.
