@@ -1,7 +1,7 @@
 # Task 2 — CPU Monitor: Docker Testing Stack
 
 **Author:** Amit Halbreich | amithalbreich15@gmail.com  
-**GitHub:** https://github.com/amithalbreich15/Devops-Elbit
+**GitHub:** https://github.com/amithalbreich15/Elbit-DevOps-Home-Assignment
 
 ---
 
