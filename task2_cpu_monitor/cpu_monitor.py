@@ -11,7 +11,7 @@ Production features:
   - systemd-compatible (logs to stdout/stderr; clean SIGTERM handling)
   - Detailed per-core breakdown included in every alert
 
-Author : Amit Halbreich  <amithalbreich15@gmail.com>
+Author : Amit Halbreich
 """
 
 import os
@@ -38,7 +38,7 @@ except ImportError:
     PROMETHEUS_ENABLED = False
 
 # ── Configuration (all overridable via environment variables) ─────────────────
-CPU_THRESHOLD   = float(os.getenv("CPU_THRESHOLD",   "20.0"))   # LOW for testing
+CPU_THRESHOLD   = float(os.getenv("CPU_THRESHOLD",   "80.0"))
 CHECK_INTERVAL  = int(os.getenv("CHECK_INTERVAL",    "5"))
 LOG_FILE        = os.getenv("LOG_FILE",              "")         # empty = stdout only
 METRICS_PORT    = int(os.getenv("METRICS_PORT",      "8000"))
@@ -71,7 +71,7 @@ SMTP_PASS  = _read_secret("SMTP_PASS",  "/run/secrets/smtp_pass")
 ALERT_TO   = _read_secret("ALERT_TO",   "/run/secrets/alert_to")
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
-_log_handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+_log_handlers = [logging.StreamHandler(sys.stdout)]
 if LOG_FILE:
     _log_handlers.append(logging.FileHandler(LOG_FILE))
 

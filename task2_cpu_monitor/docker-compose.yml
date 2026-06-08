@@ -27,7 +27,7 @@ version: "3.9"
 
 # ── Shared config ──────────────────────────────────────────────────────────────
 x-monitor-env: &monitor-env
-  CPU_THRESHOLD: ${CPU_THRESHOLD:-20}       # LOW for testing – change in .env for prod
+  CPU_THRESHOLD: ${CPU_THRESHOLD:-80}       # LOW for testing – change in .env for prod
   CHECK_INTERVAL: ${CHECK_INTERVAL:-5}
   METRICS_ENABLED: "true"
   METRICS_PORT: ${METRICS_PORT:-8000}
