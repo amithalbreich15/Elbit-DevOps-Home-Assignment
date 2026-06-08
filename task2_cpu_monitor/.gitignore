@@ -1,0 +1,19 @@
+# Secrets – NEVER commit these
+secrets/smtp_pass
+secrets/alert_to
+secrets/*.key
+secrets/*.pem
+
+# Local env overrides
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+
+# Docker build artifacts
+*.tar

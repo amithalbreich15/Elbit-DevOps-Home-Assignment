@@ -1,0 +1,160 @@
+version: "3.9"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Task 2 – CPU Monitor Full Stack
+#
+# Services:
+#   cpu-monitor      – the monitoring service (Linux image)
+#   stress-client    – Ubuntu container that generates CPU load for testing
+#   prometheus       – scrapes cpu-monitor metrics
+#   grafana          – visualises the metrics in a dashboard
+#
+# Usage:
+#   # Start entire stack
+#   docker compose up -d
+#
+#   # Trigger an alert (stress client generates CPU load automatically)
+#   docker compose logs -f cpu-monitor
+#
+#   # View metrics
+#   open http://localhost:8000/metrics   # raw Prometheus text
+#   open http://localhost:9090           # Prometheus UI
+#   open http://localhost:3000           # Grafana (admin / see .env file)
+#
+#   # Stop
+#   docker compose down -v
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Shared config ──────────────────────────────────────────────────────────────
+x-monitor-env: &monitor-env
+  CPU_THRESHOLD: ${CPU_THRESHOLD:-20}       # LOW for testing – change in .env for prod
+  CHECK_INTERVAL: ${CHECK_INTERVAL:-5}
+  METRICS_ENABLED: "true"
+  METRICS_PORT: ${METRICS_PORT:-8000}
+  LOG_FILE: ""                              # stdout only inside Docker
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  ALERT_FROM: ${ALERT_FROM:-}
+  # SMTP_PASS and ALERT_TO come from Docker secrets (see secrets: section below)
+
+services:
+
+  # ── CPU Monitor (Linux / Ubuntu) ──────────────────────────────────────────
+  cpu-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.linux
+    image: cpu-monitor:linux
+    container_name: cpu_monitor
+    restart: unless-stopped
+    ports:
+      - "${METRICS_PORT:-8000}:8000"
+    environment:
+      <<: *monitor-env
+      # Tell secret loader where to find the mounted secrets
+      SMTP_PASS_FILE: /run/secrets/smtp_pass
+      ALERT_TO_FILE:  /run/secrets/alert_to
+    secrets:
+      - smtp_pass
+      - alert_to
+    volumes:
+      - monitor_logs:/tmp/logs
+    healthcheck:
+      test: ["CMD", "python3", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/metrics')"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    networks:
+      - monitor_net
+    labels:
+      com.project.service: "cpu-monitor"
+      com.project.task: "task2"
+
+  # ── Stress Client (Ubuntu – generates CPU load to trigger alerts) ──────────
+  stress-client:
+    build:
+      context: ./stress_client
+      dockerfile: Dockerfile.stress
+    image: stress-client:ubuntu
+    container_name: stress_client
+    restart: unless-stopped
+    environment:
+      # How many seconds to stress / idle in each cycle
+      STRESS_DURATION: ${STRESS_DURATION:-30}
+      IDLE_DURATION:   ${IDLE_DURATION:-20}
+      CPU_WORKERS:     ${CPU_WORKERS:-2}
+    networks:
+      - monitor_net
+    labels:
+      com.project.service: "stress-client"
+    depends_on:
+      cpu-monitor:
+        condition: service_healthy
+
+  # ── Prometheus ──────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"           # allows POST /-/reload
+    networks:
+      - monitor_net
+    depends_on:
+      - cpu-monitor
+    labels:
+      com.project.service: "prometheus"
+
+  # ── Grafana ─────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER:     ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-changeme}
+      GF_USERS_ALLOW_SIGN_UP:     "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - monitor_net
+    depends_on:
+      - prometheus
+    labels:
+      com.project.service: "grafana"
+
+# ── Secrets (files on disk – never in env vars or image layers) ───────────────
+# Create these files before running:
+#   echo "your_smtp_password" > secrets/smtp_pass
+#   echo "alerts@yourcompany.com" > secrets/alert_to
+secrets:
+  smtp_pass:
+    file: ./secrets/smtp_pass
+  alert_to:
+    file: ./secrets/alert_to
+
+# ── Volumes ───────────────────────────────────────────────────────────────────
+volumes:
+  monitor_logs:
+  prometheus_data:
+  grafana_data:
+
+# ── Network ───────────────────────────────────────────────────────────────────
+networks:
+  monitor_net:
+    driver: bridge

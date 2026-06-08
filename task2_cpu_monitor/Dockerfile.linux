@@ -1,0 +1,83 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# CPU Monitor – Linux (Ubuntu 24.04) image
+# Targets: linux/amd64, linux/arm64
+#
+# Build:
+#   docker build -f Dockerfile.linux -t cpu-monitor:linux .
+#
+# Run (testing – low threshold, Prometheus enabled):
+#   docker run --rm -p 8000:8000 \
+#     -e CPU_THRESHOLD=20 \
+#     -e METRICS_ENABLED=true \
+#     cpu-monitor:linux
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Stage 1: build / dependency install ──────────────────────────────────────
+FROM ubuntu:24.04 AS builder
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 python3-pip python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+COPY requirements.txt .
+
+# Install into an isolated venv so nothing leaks into the system python
+RUN python3 -m venv /opt/venv \
+ && /opt/venv/bin/pip install --no-cache-dir --upgrade pip \
+ && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# ── Stage 2: minimal runtime image ───────────────────────────────────────────
+FROM ubuntu:24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+LABEL maintainer="amithalbreich15@gmail.com"
+LABEL org.opencontainers.image.title="CPU Monitor – Linux"
+LABEL org.opencontainers.image.description="Task 2 DevOps Assignment – Elbit Systems"
+LABEL org.opencontainers.image.source="https://github.com/amithalbreich15/Devops-Elbit"
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 \
+    && rm -rf /var/lib/apt/lists/* \
+    # Create non-root user for security
+    && groupadd --gid 1001 monitor \
+    && useradd  --uid 1001 --gid monitor --shell /bin/sh --no-create-home monitor
+
+# Copy venv from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+COPY cpu_monitor.py .
+
+# Secrets directory (Docker secrets are mounted here at runtime)
+RUN mkdir -p /run/secrets && chown monitor:monitor /run/secrets /app
+
+USER monitor
+
+# Prometheus metrics port
+EXPOSE 8000
+
+# ── Default environment (testing-friendly, low threshold) ────────────────────
+ENV CPU_THRESHOLD=20 \
+    CHECK_INTERVAL=5 \
+    LOG_FILE="" \
+    METRICS_ENABLED=true \
+    METRICS_PORT=8000 \
+    SMTP_HOST="" \
+    SMTP_PORT=587 \
+    SMTP_USER="" \
+    ALERT_FROM="" \
+    # Secrets loaded from /run/secrets/* at runtime – do NOT set here
+    SMTP_PASS="" \
+    ALERT_TO=""
+
+# Health-check: verify metrics endpoint is responding
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/metrics')" \
+    || exit 1
+
+CMD ["python3", "cpu_monitor.py"]

@@ -1,0 +1,12 @@
+[0;1;32m●[0m cpu_monitor.service - CPU Usage Monitor Service
+     Loaded: loaded (/etc/systemd/system/cpu_monitor.service; enabled; vendor preset: enabled)
+     Active: [0;1;32mactive (running)[0m since Mon 2026-06-08 03:19:39 IDT; 1s ago
+       Docs: https://github.com/amithalbreich15/DevOps-Home-Assignment-Elbit
+   Main PID: 3026 (python3)
+      Tasks: 1 (limit: 9377)
+     Memory: 16.5M (max: 128.0M)
+        CPU: 182ms
+     CGroup: /system.slice/cpu_monitor.service
+             └─3026 /usr/bin/python3 /opt/cpu_monitor/cpu_monitor.py
+
+Jun 08 03:19:39 Vostro5401 systemd[1]: Started CPU Usage Monitor Service.

@@ -1,0 +1,30 @@
+# prometheus/prometheus.yml
+# Scrapes the cpu-monitor service every 5 seconds.
+
+global:
+  scrape_interval:     5s   # match CHECK_INTERVAL for tight correlation
+  evaluation_interval: 5s
+  scrape_timeout:      4s
+  external_labels:
+    environment: "testing"
+    project:     "devops-elbit-task2"
+
+# ── Alerting rules (optional – uncomment to enable) ───────────────────────────
+# rule_files:
+#   - "alerts.yml"
+
+# ── Scrape targets ────────────────────────────────────────────────────────────
+scrape_configs:
+
+  - job_name: "cpu_monitor"
+    static_configs:
+      - targets: ["cpu-monitor:8000"]
+        labels:
+          service: "cpu-monitor"
+          task:    "task2"
+    metrics_path: /metrics
+
+  # Prometheus scrapes itself (useful for monitoring the monitor)
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

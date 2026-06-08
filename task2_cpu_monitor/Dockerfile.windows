@@ -1,0 +1,78 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# CPU Monitor – Windows (Windows Server Core LTSC 2022) image
+# Platform: windows/amd64
+#
+# REQUIREMENTS:
+#   - Docker Desktop with Windows containers enabled
+#   - Switch to Windows containers: right-click Docker tray icon → "Switch to Windows containers"
+#
+# Build (must be run on a Windows host or Windows CI runner):
+#   docker build -f Dockerfile.windows -t cpu-monitor:windows .
+#
+# Run (testing – low threshold, Prometheus enabled):
+#   docker run --rm -p 8000:8000 `
+#     -e CPU_THRESHOLD=20 `
+#     -e METRICS_ENABLED=true `
+#     cpu-monitor:windows
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Stage 1: install Python & dependencies ────────────────────────────────────
+FROM mcr.microsoft.com/windows/servercore:ltsc2022 AS builder
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+# Install Python 3.12 silently
+RUN Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.12.4/python-3.12.4-amd64.exe' \
+        -OutFile C:\python_installer.exe ; \
+    Start-Process -FilePath C:\python_installer.exe \
+        -ArgumentList '/quiet', 'InstallAllUsers=1', 'PrependPath=1', 'Include_pip=1' \
+        -NoNewWindow -Wait ; \
+    Remove-Item C:\python_installer.exe
+
+WORKDIR C:\build
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --upgrade pip ; \
+    pip install --no-cache-dir -r requirements.txt
+
+# ── Stage 2: runtime image ────────────────────────────────────────────────────
+FROM mcr.microsoft.com/windows/servercore:ltsc2022 AS runtime
+
+SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
+
+LABEL maintainer="amithalbreich15@gmail.com"
+LABEL org.opencontainers.image.title="CPU Monitor – Windows"
+LABEL org.opencontainers.image.description="Task 2 DevOps Assignment – Elbit Systems"
+
+# Copy Python and installed packages from builder
+COPY --from=builder C:\Python312  C:\Python312
+COPY --from=builder C:\Users\ContainerAdministrator\AppData\Roaming\Python  \
+                    C:\Users\ContainerAdministrator\AppData\Roaming\Python
+
+RUN setx /M PATH "C:\Python312;C:\Python312\Scripts;%PATH%"
+
+WORKDIR C:\app
+COPY cpu_monitor.py .
+
+# Secrets directory (for Docker secrets on Windows)
+RUN New-Item -ItemType Directory -Force -Path C:\ProgramData\secrets | Out-Null
+
+EXPOSE 8000
+
+# ── Default environment (testing-friendly) ────────────────────────────────────
+ENV CPU_THRESHOLD=20 \
+    CHECK_INTERVAL=5 \
+    LOG_FILE="" \
+    METRICS_ENABLED=true \
+    METRICS_PORT=8000 \
+    SMTP_HOST="" \
+    SMTP_PORT=587 \
+    SMTP_USER="" \
+    ALERT_FROM="" \
+    SMTP_PASS="" \
+    ALERT_TO=""
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/metrics')"]
+
+CMD ["python", "C:\\app\\cpu_monitor.py"]
